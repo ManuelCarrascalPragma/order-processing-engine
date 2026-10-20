@@ -1,0 +1,117 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.3.0'
+    id 'io.spring.dependency-management' version '1.1.4'
+    id 'jacoco'
+    id 'org.owasp.dependencycheck' version '9.2.0'
+    id 'info.solidsoft.pitest' version '1.19.0'
+}
+
+group = 'co.com.pragma'
+version = '1.0.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = '21'
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    set('archunitVersion', "1.3.0")
+    set('mapstructVersion', "1.6.0")
+}
+
+dependencies {
+    // Core
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // Mapping (MapStruct - genera código en compile-time)
+    implementation "org.mapstruct:mapstruct:${mapstructVersion}"
+    annotationProcessor "org.mapstruct:mapstruct-processor:${mapstructVersion}"
+
+    // Persistence
+    runtimeOnly 'com.h2database:h2'
+
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation "com.tngtech.archunit:archunit-junit5:${archunitVersion}"
+    testImplementation 'org.testcontainers:junit-jupiter'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.testcontainers:testcontainers-bom:1.20.1"
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+// ---------------------------------------------------------------------------
+// Quality Gate: JaCoCo (cobertura)
+//   - BUNDLE (global): linea >= 70%
+//   - domain package:  linea >= 80%
+// ---------------------------------------------------------------------------
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            element = 'BUNDLE'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.70
+            }
+        }
+        rule {
+            element = 'PACKAGE'
+            includes = ['co.com.pragma.orderengine.domain.*']
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.80
+            }
+        }
+    }
+}
+
+check.dependsOn jacocoTestCoverageVerification
+
+// ---------------------------------------------------------------------------
+// Quality Gate: OWASP Dependency Check
+//   - Falla el build con vulnerabilidades CVSS >= 7
+// ---------------------------------------------------------------------------
+dependencyCheck {
+    failBuildOnCVSS = 7
+    formats = ['HTML', 'JSON']
+}
+
+// ---------------------------------------------------------------------------
+// Quality Gate: Pitest (mutation testing)
+//   - Mutation score minimo: 60%, sobre el domain package
+// ---------------------------------------------------------------------------
+pitest {
+    targetClasses = ['co.com.pragma.orderengine.domain.*']
+    threads = 4
+    mutationThreshold = 60
+    junit5PluginVersion = '1.2.1'
+    outputFormats = ['HTML']
+}

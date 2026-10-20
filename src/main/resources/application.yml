@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: order-processing-engine
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:orderdb;DB_CLOSE_DELAY=-1}
+    driverClassName: ${DB_DRIVER:org.h2.Driver}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+  jpa:
+    database-platform: ${DB_DIALECT:org.hibernate.dialect.H2Dialect}
+    hibernate:
+      ddl-auto: ${DB_DDL_AUTO:create-drop}
+    show-sql: ${DB_SHOW_SQL:false}
+server:
+  port: ${SERVER_PORT:8080}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
