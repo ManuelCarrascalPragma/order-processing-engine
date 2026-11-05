@@ -24,20 +24,17 @@ ext {
 }
 
 dependencies {
-    // Core
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
-    // Mapping (MapStruct - genera código en compile-time)
     implementation "org.mapstruct:mapstruct:${mapstructVersion}"
     annotationProcessor "org.mapstruct:mapstruct-processor:${mapstructVersion}"
 
-    // Persistence
-    runtimeOnly 'com.h2database:h2'
+    runtimeOnly 'com.h2database:h2'        
+    runtimeOnly 'org.postgresql:postgresql'  
 
-    // Testing
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation "com.tngtech.archunit:archunit-junit5:${archunitVersion}"
     testImplementation 'org.testcontainers:junit-jupiter'
@@ -106,10 +103,8 @@ check.dependsOn jacocoTestCoverageVerification
 dependencyCheck {
     failBuildOnCVSS = 7
     formats = ['HTML', 'JSON']
-    // Tolerar fallos al actualizar la base de datos de la NVD.
     failOnError = false
     nvd {
-        // Si existe la variable de entorno NVD_API_KEY, se usa automaticamente.
         apiKey = System.getenv('NVD_API_KEY')
     }
 }

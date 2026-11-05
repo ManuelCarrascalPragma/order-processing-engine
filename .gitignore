@@ -18,6 +18,8 @@ gradle-app.setting
 # ---------------------------------------------------------------------------
 *.class
 *.log
+*.log.gz
+logs/
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
 *.war
