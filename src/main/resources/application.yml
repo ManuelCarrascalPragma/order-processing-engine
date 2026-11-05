@@ -1,18 +1,20 @@
+# ---------------------------------------------------------------------------
+# Configuracion TRANSVERSAL (comun a todos los ambientes)
+#   Las conexiones (datasource, jpa) y credenciales viven en los perfiles
+#   especificos: application-dev.yml / application-prod.yml
+#
+# Enrutador de perfiles dinamico: cae en 'dev' si no se define
+# SPRING_PROFILES_ACTIVE en el entorno.
+# ---------------------------------------------------------------------------
 spring:
   application:
     name: order-processing-engine
-  datasource:
-    url: ${DB_URL:jdbc:h2:mem:orderdb;DB_CLOSE_DELAY=-1}
-    driverClassName: ${DB_DRIVER:org.h2.Driver}
-    username: ${DB_USERNAME:sa}
-    password: ${DB_PASSWORD:}
-  jpa:
-    database-platform: ${DB_DIALECT:org.hibernate.dialect.H2Dialect}
-    hibernate:
-      ddl-auto: ${DB_DDL_AUTO:create-drop}
-    show-sql: ${DB_SHOW_SQL:false}
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
 server:
   port: ${SERVER_PORT:8080}
+
 management:
   endpoints:
     web:
@@ -22,3 +24,7 @@ management:
     health:
       probes:
         enabled: true
+        
+payment:
+  stripe:
+    secret-key: ${STRIPE_SECRET_KEY:sk_test_local}

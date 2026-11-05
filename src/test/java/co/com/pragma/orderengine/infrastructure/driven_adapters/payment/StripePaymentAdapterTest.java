@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StripePaymentAdapterTest {
 
-    private final StripePaymentAdapter adapter = new StripePaymentAdapter();
+    private final StripePaymentAdapter adapter = new StripePaymentAdapter("sk_test_dummy");
 
     @Test
     void shouldReturnSuccessfulPaymentResult() {

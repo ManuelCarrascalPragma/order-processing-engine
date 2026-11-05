@@ -1,0 +1,28 @@
+# ---------------------------------------------------------------------------
+# Perfil: PROD (produccion)
+#   EVIDENCIA PRINCIPAL: NO hay valores quemados (hardcoded).
+#   Todos los datos de conexion y secretos se leen EXCLUSIVAMENTE de variables
+#   de entorno. Si una variable obligatoria no esta definida, la aplicacion
+#   NO arranca (fail-fast), evitando usar credenciales por defecto inseguras.
+# ---------------------------------------------------------------------------
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DB_URL}
+    driver-class-name: ${DB_DRIVER:org.postgresql.Driver}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+  jpa:
+    database-platform: ${DB_DIALECT:org.hibernate.dialect.PostgreSQLDialect}
+    hibernate:
+      ddl-auto: ${DB_DDL_AUTO:validate}
+    show-sql: false
+
+payment:
+  stripe:
+    secret-key: ${STRIPE_SECRET_KEY}

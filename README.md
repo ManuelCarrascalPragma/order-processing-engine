@@ -58,6 +58,45 @@ docker run -p 8080:8080 --env-file .env order-processing-engine
 
 Las variables de entorno estan documentadas en [`.env.example`](.env.example).
 
+## Ambientes (Profiles)
+
+El perfil activo se resuelve dinamicamente y **cae en `dev`** si no se define
+`SPRING_PROFILES_ACTIVE` (`spring.profiles.active: ${SPRING_PROFILES_ACTIVE:dev}`).
+
+| Perfil | Archivo                  | Base de datos                       | SQL visible | Secretos                                  |
+|--------|--------------------------|-------------------------------------|-------------|-------------------------------------------|
+| `dev`  | `application-dev.yml`    | H2 en memoria (o Postgres via vars) | si          | valores de prueba por defecto             |
+| `prod` | `application-prod.yml`   | PostgreSQL (obligatoria via vars)   | no          | **obligatorios** via variables de entorno |
+
+- `application.yml` contiene solo configuracion **transversal** (nombre, puerto,
+  actuator) y el enrutador de perfiles.
+- En `prod` **no hay valores quemados**: `url: ${DB_URL}`, `username: ${DB_USERNAME}`,
+  `password: ${DB_PASSWORD}`, `secret-key: ${STRIPE_SECRET_KEY}`. Si falta una
+  variable obligatoria, la aplicacion **no arranca** (fail-fast).
+
+```bash
+# dev (por defecto)
+./gradlew bootRun
+
+# prod (exige variables de entorno)
+SPRING_PROFILES_ACTIVE=prod \
+DB_URL=jdbc:postgresql://host:5432/orderdb \
+DB_USERNAME=order_user DB_PASSWORD=*** \
+STRIPE_SECRET_KEY=sk_live_*** \
+./gradlew bootRun
+```
+
+## Logging (Logback)
+
+Configurado en [`logback-spring.xml`](src/main/resources/logback-spring.xml):
+
+- **ConsoleAppender** coloreado: fecha, nivel, hilo, clase de origen y mensaje.
+- **RollingFileAppender** a `logs/order-engine.log` con `SizeAndTimeBasedRollingPolicy`:
+  rota diariamente **o** al superar **10MB**, comprime a `.gz`, conserva 30 dias (tope 1GB).
+- **Granularidad**: `root` en `INFO` (silencia el ruido de Spring/librerias) y el
+  paquete de negocio `co.com.pragma.orderengine` en `DEBUG` (rastreo exclusivo de la
+  logica propia).
+
 ## Endpoints
 
 | Metodo | Ruta                          | Descripcion                         |

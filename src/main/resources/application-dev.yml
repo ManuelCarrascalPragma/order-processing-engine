@@ -1,0 +1,28 @@
+# ---------------------------------------------------------------------------
+# Perfil: DEV (desarrollo local)
+#   - Base de datos de desarrollo. Por defecto H2 en memoria para arrancar
+#     sin dependencias; conmutable a Postgres local/Docker via variables.
+#   - SQL visible (show-sql) para depuracion.
+#   - Credenciales de prueba (no sensibles).
+# ---------------------------------------------------------------------------
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:orderdb;DB_CLOSE_DELAY=-1}
+    driver-class-name: ${DB_DRIVER:org.h2.Driver}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+  jpa:
+    database-platform: ${DB_DIALECT:org.hibernate.dialect.H2Dialect}
+    hibernate:
+      ddl-auto: ${DB_DDL_AUTO:create-drop}
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+payment:
+  stripe:
+    secret-key: ${STRIPE_SECRET_KEY:sk_test_dev_dummy}
