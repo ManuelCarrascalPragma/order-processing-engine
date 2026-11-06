@@ -22,6 +22,12 @@ spring:
     hibernate:
       ddl-auto: ${DB_DDL_AUTO:validate}
     show-sql: false
+  # Redis: OBLIGATORIO via variables de entorno (sin defaults, fail-fast)
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD:}
 
 payment:
   stripe:

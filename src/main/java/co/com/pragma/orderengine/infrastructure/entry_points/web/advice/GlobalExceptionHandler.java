@@ -1,5 +1,6 @@
 package co.com.pragma.orderengine.infrastructure.entry_points.web.advice;
 
+import co.com.pragma.orderengine.domain.model.exception.IdempotencyKeyInProgressException;
 import co.com.pragma.orderengine.domain.model.exception.InvalidOrderStateException;
 import co.com.pragma.orderengine.domain.model.exception.OrderNotFoundException;
 import co.com.pragma.orderengine.domain.model.exception.PaymentFailedException;
@@ -30,6 +31,14 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.PRECONDITION_FAILED, ex.getMessage());
         problem.setTitle("Version Conflict");
         problem.setType(URI.create("https://api.pragma.co.com/problems/version-conflict"));
+        return problem;
+    }
+
+    @ExceptionHandler(IdempotencyKeyInProgressException.class)
+    public ProblemDetail handleIdempotencyInProgress(IdempotencyKeyInProgressException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Idempotency Key In Progress");
+        problem.setType(URI.create("https://api.pragma.co.com/problems/idempotency-key-in-progress"));
         return problem;
     }
 
