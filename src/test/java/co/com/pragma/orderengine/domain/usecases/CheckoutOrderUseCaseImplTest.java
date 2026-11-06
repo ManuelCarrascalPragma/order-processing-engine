@@ -35,6 +35,7 @@ class CheckoutOrderUseCaseImplTest {
     void shouldSuccessfullyProcessOrderCheckout() {
         Order order = new Order("ord-123", "client@example.com", Money.ofUsd(150.0));
         when(paymentGateway.charge(any(Money.class))).thenReturn(new PaymentResult(true, "tx-999"));
+        when(orderRepository.save(any(Order.class))).thenReturn(order);
 
         checkoutOrderUseCase.execute(order);
 

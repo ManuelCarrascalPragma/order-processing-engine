@@ -99,21 +99,61 @@ Configurado en [`logback-spring.xml`](src/main/resources/logback-spring.xml):
 
 ## Endpoints
 
-| Metodo | Ruta                          | Descripcion                         |
-|--------|-------------------------------|-------------------------------------|
-| POST   | `/api/v1/orders/checkout`     | Crea y procesa (cobra) una orden    |
-| GET    | `/api/v1/orders/{id}`         | Consulta una orden por su id        |
-| GET    | `/actuator/health`            | Health check                        |
+| Metodo | Ruta                          | Descripcion                                  | Cabeceras            | Exito |
+|--------|-------------------------------|----------------------------------------------|----------------------|-------|
+| POST   | `/api/v1/orders/checkout`     | Crea y procesa (cobra) una orden (idempotente)| `Idempotency-Key`    | 201   |
+| GET    | `/api/v1/orders/{id}`         | Consulta una orden por su id                 | -                    | 200   |
+| PATCH  | `/api/v1/orders/{id}/status`  | Modifica SOLO el estado (bloqueo optimista)  | `If-Match: <version>`| 200   |
+| PUT    | `/api/v1/orders/{id}`         | Reemplaza la orden COMPLETA                   | -                    | 200   |
+| GET    | `/actuator/health`            | Health check                                 | -                    | 200   |
 
-Ejemplo de checkout:
+### POST idempotente (Idempotency-Key)
+
+El POST exige la cabecera `Idempotency-Key`. Reintentos con la misma clave devuelven
+el mismo resultado (status + body) sin reprocesar el cobro, consultando la tabla
+`idempotency_record`.
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/orders/checkout \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 1f3c9b2a-..." \
   -d '{"email":"client@example.com","amount":150.0}'
 ```
 
-Los errores se devuelven en formato **RFC 7807 (Problem Details)**.
+### PATCH idempotente con If-Match (bloqueo optimista)
+
+El PATCH modifica solo el campo enviado (el estado) y exige `If-Match` con la
+`version` actual de la orden. Si la version no coincide, responde **412 Precondition
+Failed** (conflicto de bloqueo optimista, respaldado por `@Version` en JPA).
+
+```bash
+curl -X PATCH http://localhost:8080/api/v1/orders/{id}/status \
+  -H "Content-Type: application/json" \
+  -H "If-Match: 0" \
+  -d '{"status":"CANCELLED"}'
+```
+
+### PUT vs PATCH
+
+- **PUT** `/api/v1/orders/{id}`: reemplazo **completo**. El cliente envia el objeto
+  entero; los campos ausentes se interpretan como el nuevo estado del recurso.
+- **PATCH** `/api/v1/orders/{id}/status`: modificacion **parcial**, recibe solo los
+  campos a cambiar (`UpdateOrderStatusRequest`).
+
+### Mapeo de codigos HTTP
+
+Los errores se devuelven en formato **RFC 7807 (Problem Details)**:
+
+| Situacion                              | Codigo                    |
+|----------------------------------------|---------------------------|
+| POST exitoso                           | 201 Created               |
+| GET / PATCH / PUT exitoso              | 200 OK                    |
+| Validacion de DTO fallida              | 400 Bad Request           |
+| Cabecera obligatoria ausente           | 400 Bad Request           |
+| Recurso no encontrado                  | 404 Not Found             |
+| Transicion de estado invalida          | 409 Conflict              |
+| If-Match / version no coincide         | 412 Precondition Failed   |
+| Error no controlado                    | 500 Internal Server Error |
 
 ## Quality Gates
 

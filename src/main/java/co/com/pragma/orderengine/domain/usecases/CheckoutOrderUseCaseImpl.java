@@ -19,7 +19,7 @@ public class CheckoutOrderUseCaseImpl implements ICheckoutOrderUseCase {
     }
 
     @Override
-    public void execute(Order order) {
+    public Order execute(Order order) {
         order.validateCanBeProcessed();
 
         PaymentResult paymentResult = paymentGateway.charge(order.getTotalAmount());
@@ -28,6 +28,6 @@ public class CheckoutOrderUseCaseImpl implements ICheckoutOrderUseCase {
         }
 
         order.markAsPaid(paymentResult.transactionId());
-        orderRepository.save(order);
+        return orderRepository.save(order);
     }
 }

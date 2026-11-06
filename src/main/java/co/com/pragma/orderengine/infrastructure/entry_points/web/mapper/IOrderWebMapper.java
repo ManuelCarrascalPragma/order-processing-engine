@@ -15,6 +15,7 @@ public interface IOrderWebMapper {
     @Mapping(target = "amount", source = "totalAmount.amount")
     @Mapping(target = "currency", source = "totalAmount.currency", qualifiedByName = "currencyToCode")
     @Mapping(target = "status", source = "status", qualifiedByName = "statusToString")
+    @Mapping(target = "version", source = "version")
     OrderResponse toResponse(Order order);
 
     @Named("currencyToCode")

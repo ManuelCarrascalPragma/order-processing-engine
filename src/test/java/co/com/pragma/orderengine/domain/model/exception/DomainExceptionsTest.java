@@ -19,4 +19,18 @@ class DomainExceptionsTest {
 
         assertEquals("invalid state", ex.getMessage());
     }
+
+    @Test
+    void versionConflictExceptionShouldCarryMessage() {
+        VersionConflictException ex = new VersionConflictException("version conflict");
+
+        assertEquals("version conflict", ex.getMessage());
+    }
+
+    @Test
+    void orderNotFoundExceptionShouldCarryMessage() {
+        OrderNotFoundException ex = new OrderNotFoundException("not found");
+
+        assertEquals("not found", ex.getMessage());
+    }
 }
