@@ -10,7 +10,9 @@ import co.com.pragma.orderengine.domain.model.exception.VersionConflictException
 import co.com.pragma.orderengine.domain.ports.in.ICheckoutOrderUseCase;
 import co.com.pragma.orderengine.domain.ports.in.IReplaceOrderUseCase;
 import co.com.pragma.orderengine.domain.ports.in.IUpdateOrderStatusUseCase;
+import co.com.pragma.orderengine.domain.ports.out.IIdempotencyKeyLockPort;
 import co.com.pragma.orderengine.domain.ports.out.IIdempotencyStorePort;
+import co.com.pragma.orderengine.infrastructure.entry_points.web.service.CachedOrderService;
 import co.com.pragma.orderengine.domain.ports.out.IOrderRepositoryPort;
 import co.com.pragma.orderengine.infrastructure.entry_points.web.advice.GlobalExceptionHandler;
 import co.com.pragma.orderengine.infrastructure.entry_points.web.mapper.IOrderWebMapperImpl;
@@ -37,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(OrderController.class)
-@Import({IOrderWebMapperImpl.class, GlobalExceptionHandler.class})
+@Import({IOrderWebMapperImpl.class, GlobalExceptionHandler.class, CachedOrderService.class})
 class OrderControllerTest {
 
     @Autowired
@@ -58,12 +60,44 @@ class OrderControllerTest {
     @MockBean
     private IIdempotencyStorePort idempotencyStore;
 
+    @MockBean
+    private IIdempotencyKeyLockPort idempotencyKeyLock;
+
+    @Test
+    void shouldReturn409WhenIdempotencyKeyIsBeingProcessed() throws Exception {
+        when(idempotencyStore.findByKey("key-busy")).thenReturn(Optional.empty());
+        when(idempotencyKeyLock.tryAcquire("key-busy")).thenReturn(false);
+
+        mockMvc.perform(post("/api/v1/orders/checkout")
+                        .header("Idempotency-Key", "key-busy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"client@example.com\",\"amount\":150.0}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Idempotency Key In Progress"));
+    }
+
+    @Test
+    void shouldReleaseIdempotencyKeyWhenProcessingFails() throws Exception {
+        when(idempotencyStore.findByKey("key-fail")).thenReturn(Optional.empty());
+        when(idempotencyKeyLock.tryAcquire("key-fail")).thenReturn(true);
+        doThrow(new PaymentFailedException("Payment processing failed"))
+                .when(checkoutOrderUseCase).execute(any(Order.class));
+
+        mockMvc.perform(post("/api/v1/orders/checkout")
+                        .header("Idempotency-Key", "key-fail")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"client@example.com\",\"amount\":150.0}"))
+                .andExpect(status().isPaymentRequired());
+
+        org.mockito.Mockito.verify(idempotencyKeyLock).release("key-fail");
+    }
 
     @Test
     void shouldReturn201WhenCheckoutSucceeds() throws Exception {
         Order paid = new Order("ord-1", "client@example.com", Money.ofUsd(150.0),
                 OrderStatus.PAID, "tx-1", 0L);
         when(idempotencyStore.findByKey("key-1")).thenReturn(Optional.empty());
+        when(idempotencyKeyLock.tryAcquire("key-1")).thenReturn(true);
         when(checkoutOrderUseCase.execute(any(Order.class))).thenReturn(paid);
 
         mockMvc.perform(post("/api/v1/orders/checkout")
@@ -112,6 +146,7 @@ class OrderControllerTest {
     @Test
     void shouldReturn402WhenPaymentFails() throws Exception {
         when(idempotencyStore.findByKey("key-p")).thenReturn(Optional.empty());
+        when(idempotencyKeyLock.tryAcquire("key-p")).thenReturn(true);
         doThrow(new PaymentFailedException("Payment processing failed"))
                 .when(checkoutOrderUseCase).execute(any(Order.class));
 

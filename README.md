@@ -140,6 +140,26 @@ curl -X PATCH http://localhost:8080/api/v1/orders/{id}/status \
 - **PATCH** `/api/v1/orders/{id}/status`: modificacion **parcial**, recibe solo los
   campos a cambiar (`UpdateOrderStatusRequest`).
 
+## Cache con Redis
+
+Levantar Redis local: `docker compose up -d redis` (imagen `redis:7-alpine`, puerto 6379).
+Configuracion por `REDIS_HOST` / `REDIS_PORT` (obligatorias en `prod`).
+`RedisCacheConfig` habilita `@EnableCaching` con un TTL global de 1 hora.
+
+| Estrategia | Donde | Mecanismo | Por que |
+|------------|-------|-----------|---------|
+| TTL para idempotencia | `POST /checkout` | `setIfAbsent(key, "PROCESSED", 24h)` (SET NX EX, atomico) | Evita doble procesamiento concurrente; las llaves expiran solas |
+| Cache-Aside | `GET /orders/{id}` | `@Cacheable("orders")` | Lecturas frecuentes salen de Redis; la BD solo se consulta en cache miss |
+| Write-Through | `PATCH` y `PUT` | `@CachePut("orders")` | La escritura en BD actualiza Redis al instante; no se sirven datos viejos |
+
+Notas de diseno:
+- El POST usa Redis como candado atomico y la tabla `idempotency_record` como fuente para
+  reproducir la respuesta. Llave repetida con respuesta guardada: se reproduce. Llave en curso
+  sin respuesta: `409`. Si el procesamiento falla, la llave se libera para permitir reintento.
+- Las anotaciones de cache viven en `CachedOrderService` (infraestructura) para que el dominio
+  siga sin depender de Spring (regla ArchUnit).
+- Una orden inexistente lanza `OrderNotFoundException` (404) y no se cachea.
+
 ### Mapeo de codigos HTTP
 
 Los errores se devuelven en formato **RFC 7807 (Problem Details)**:

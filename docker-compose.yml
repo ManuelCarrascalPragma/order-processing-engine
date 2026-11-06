@@ -1,0 +1,16 @@
+# ---------------------------------------------------------------------------
+# Infraestructura local para desarrollo
+#   docker compose up -d redis
+# ---------------------------------------------------------------------------
+services:
+  redis:
+    image: redis:7-alpine      
+    container_name: order-engine-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5

@@ -1,5 +1,6 @@
 package co.com.pragma.orderengine.infrastructure.entry_points.web.dto;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 
 public record OrderResponse(
@@ -10,4 +11,4 @@ public record OrderResponse(
         String status,
         String transactionId,
         Long version
-) {}
+) implements Serializable {}

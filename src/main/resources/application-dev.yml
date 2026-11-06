@@ -22,6 +22,11 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  # Redis local (docker compose up -d redis)
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 payment:
   stripe:

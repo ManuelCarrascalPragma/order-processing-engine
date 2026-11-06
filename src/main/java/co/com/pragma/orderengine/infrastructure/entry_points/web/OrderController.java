@@ -1,18 +1,18 @@
 package co.com.pragma.orderengine.infrastructure.entry_points.web;
 
+import co.com.pragma.orderengine.domain.model.IdempotencyRecord;
 import co.com.pragma.orderengine.domain.model.Money;
 import co.com.pragma.orderengine.domain.model.Order;
-import co.com.pragma.orderengine.domain.model.IdempotencyRecord;
+import co.com.pragma.orderengine.domain.model.exception.IdempotencyKeyInProgressException;
 import co.com.pragma.orderengine.domain.ports.in.ICheckoutOrderUseCase;
-import co.com.pragma.orderengine.domain.ports.in.IReplaceOrderUseCase;
-import co.com.pragma.orderengine.domain.ports.in.IUpdateOrderStatusUseCase;
+import co.com.pragma.orderengine.domain.ports.out.IIdempotencyKeyLockPort;
 import co.com.pragma.orderengine.domain.ports.out.IIdempotencyStorePort;
-import co.com.pragma.orderengine.domain.ports.out.IOrderRepositoryPort;
 import co.com.pragma.orderengine.infrastructure.entry_points.web.dto.CreateOrderRequest;
 import co.com.pragma.orderengine.infrastructure.entry_points.web.dto.OrderResponse;
 import co.com.pragma.orderengine.infrastructure.entry_points.web.dto.ReplaceOrderRequest;
 import co.com.pragma.orderengine.infrastructure.entry_points.web.dto.UpdateOrderStatusRequest;
 import co.com.pragma.orderengine.infrastructure.entry_points.web.mapper.IOrderWebMapper;
+import co.com.pragma.orderengine.infrastructure.entry_points.web.service.CachedOrderService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
@@ -36,30 +36,26 @@ import java.util.UUID;
 public class OrderController {
 
     private final ICheckoutOrderUseCase checkoutOrderUseCase;
-    private final IUpdateOrderStatusUseCase updateOrderStatusUseCase;
-    private final IReplaceOrderUseCase replaceOrderUseCase;
-    private final IOrderRepositoryPort orderRepository;
+    private final CachedOrderService cachedOrderService;
     private final IIdempotencyStorePort idempotencyStore;
+    private final IIdempotencyKeyLockPort idempotencyKeyLock;
     private final IOrderWebMapper mapper;
     private final ObjectMapper objectMapper;
 
     public OrderController(ICheckoutOrderUseCase checkoutOrderUseCase,
-                           IUpdateOrderStatusUseCase updateOrderStatusUseCase,
-                           IReplaceOrderUseCase replaceOrderUseCase,
-                           IOrderRepositoryPort orderRepository,
+                           CachedOrderService cachedOrderService,
                            IIdempotencyStorePort idempotencyStore,
+                           IIdempotencyKeyLockPort idempotencyKeyLock,
                            IOrderWebMapper mapper,
                            ObjectMapper objectMapper) {
         this.checkoutOrderUseCase = checkoutOrderUseCase;
-        this.updateOrderStatusUseCase = updateOrderStatusUseCase;
-        this.replaceOrderUseCase = replaceOrderUseCase;
-        this.orderRepository = orderRepository;
+        this.cachedOrderService = cachedOrderService;
         this.idempotencyStore = idempotencyStore;
+        this.idempotencyKeyLock = idempotencyKeyLock;
         this.mapper = mapper;
         this.objectMapper = objectMapper;
     }
 
-    
     @PostMapping("/checkout")
     public ResponseEntity<OrderResponse> checkout(
             @RequestHeader(value = "Idempotency-Key") String idempotencyKey,
@@ -70,14 +66,27 @@ public class OrderController {
             return replay(existing.get());
         }
 
-        Order order = new Order(
-                UUID.randomUUID().toString(),
-                request.email(),
-                Money.ofUsd(request.amount().doubleValue())
-        );
-        Order processed = checkoutOrderUseCase.execute(order);
-        OrderResponse body = mapper.toResponse(processed);
+        if (!idempotencyKeyLock.tryAcquire(idempotencyKey)) {
+            return idempotencyStore.findByKey(idempotencyKey)
+                    .map(this::replay)
+                    .orElseThrow(() -> new IdempotencyKeyInProgressException(
+                            "A request with this Idempotency-Key is already being processed"));
+        }
 
+        Order processed;
+        try {
+            Order order = new Order(
+                    UUID.randomUUID().toString(),
+                    request.email(),
+                    Money.ofUsd(request.amount().doubleValue())
+            );
+            processed = checkoutOrderUseCase.execute(order);
+        } catch (RuntimeException ex) {
+            idempotencyKeyLock.release(idempotencyKey);
+            throw ex;
+        }
+
+        OrderResponse body = mapper.toResponse(processed);
         idempotencyStore.save(new IdempotencyRecord(
                 idempotencyKey, HttpStatus.CREATED.value(), serialize(body)));
 
@@ -86,10 +95,7 @@ public class OrderController {
 
     @GetMapping("/{id}")
     public ResponseEntity<OrderResponse> getOrder(@PathVariable String id) {
-        return orderRepository.findById(id)
-                .map(mapper::toResponse)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return ResponseEntity.ok(cachedOrderService.getById(id));
     }
 
     @PatchMapping("/{id}/status")
@@ -98,8 +104,7 @@ public class OrderController {
             @RequestHeader(value = "If-Match") Long version,
             @Valid @RequestBody UpdateOrderStatusRequest request) {
 
-        Order updated = updateOrderStatusUseCase.execute(id, request.status(), version);
-        return ResponseEntity.ok(mapper.toResponse(updated));
+        return ResponseEntity.ok(cachedOrderService.updateStatus(id, request.status(), version));
     }
 
     @PutMapping("/{id}")
@@ -114,8 +119,7 @@ public class OrderController {
                 request.status(),
                 request.transactionId()
         );
-        Order replaced = replaceOrderUseCase.execute(replacement);
-        return ResponseEntity.ok(mapper.toResponse(replaced));
+        return ResponseEntity.ok(cachedOrderService.replace(id, replacement));
     }
 
     private ResponseEntity<OrderResponse> replay(IdempotencyRecord record) {
