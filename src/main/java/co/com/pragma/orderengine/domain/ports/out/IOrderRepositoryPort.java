@@ -6,5 +6,6 @@ import java.util.Optional;
 
 public interface IOrderRepositoryPort {
     Order save(Order order);
+    Order update(Order order);
     Optional<Order> findById(String id);
 }

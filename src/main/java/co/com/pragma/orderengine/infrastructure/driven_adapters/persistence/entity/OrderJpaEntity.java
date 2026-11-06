@@ -3,6 +3,7 @@ package co.com.pragma.orderengine.infrastructure.driven_adapters.persistence.ent
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.math.BigDecimal;
 
@@ -16,6 +17,9 @@ public class OrderJpaEntity {
     private String currency;
     private String status;
     private String transactionId;
+
+    @Version
+    private Long version;
 
     public OrderJpaEntity() {}
 
@@ -34,6 +38,7 @@ public class OrderJpaEntity {
     public String getCurrency() { return currency; }
     public String getStatus() { return status; }
     public String getTransactionId() { return transactionId; }
+    public Long getVersion() { return version; }
 
     public void setId(String id) { this.id = id; }
     public void setCustomerEmail(String customerEmail) { this.customerEmail = customerEmail; }
@@ -41,4 +46,5 @@ public class OrderJpaEntity {
     public void setCurrency(String currency) { this.currency = currency; }
     public void setStatus(String status) { this.status = status; }
     public void setTransactionId(String transactionId) { this.transactionId = transactionId; }
+    public void setVersion(Long version) { this.version = version; }
 }

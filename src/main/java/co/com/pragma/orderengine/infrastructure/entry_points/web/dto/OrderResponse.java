@@ -8,5 +8,6 @@ public record OrderResponse(
         BigDecimal amount,
         String currency,
         String status,
-        String transactionId
+        String transactionId,
+        Long version
 ) {}

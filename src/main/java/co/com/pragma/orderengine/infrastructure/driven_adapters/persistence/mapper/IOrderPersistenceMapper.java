@@ -16,6 +16,7 @@ public interface IOrderPersistenceMapper {
     @Mapping(target = "amount", source = "totalAmount.amount")
     @Mapping(target = "currency", source = "totalAmount.currency", qualifiedByName = "currencyToCode")
     @Mapping(target = "status", source = "status", qualifiedByName = "statusToString")
+    @Mapping(target = "version", source = "version")
     OrderJpaEntity toEntity(Order order);
 
     default Order toDomain(OrderJpaEntity entity) {
@@ -27,7 +28,8 @@ public interface IOrderPersistenceMapper {
                 entity.getCustomerEmail(),
                 new Money(entity.getAmount(), Currency.getInstance(entity.getCurrency())),
                 OrderStatus.valueOf(entity.getStatus()),
-                entity.getTransactionId()
+                entity.getTransactionId(),
+                entity.getVersion()
         );
     }
 
